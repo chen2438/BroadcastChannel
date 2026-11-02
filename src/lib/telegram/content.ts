@@ -1,6 +1,5 @@
 import type { CheerioAPI } from 'cheerio'
 import type { IndexedStaticProxyOptions, MessageSelection, StaticProxyOptions } from './types'
-import flourite from 'flourite'
 import prism, { ensurePrismLanguage } from '../prism'
 import { getCustomEmojiImage } from './emoji'
 import { normalizeUrlAttribute, normalizeUrlAttributes, proxyStyleUrls } from './url'
@@ -77,9 +76,13 @@ export async function modifyHTMLContent($: CheerioAPI, content: MessageSelection
       pre.find('br').replaceWith('\n')
 
       const code = pre.text()
-      const detectedLanguage = flourite(code, { shiki: true, noUnknown: true }).language || 'text'
-      const language = await ensurePrismLanguage(detectedLanguage)
-      const grammar = prism.languages[language]
+      // Telegram uses data-language; also accept standard pre/code language classes.
+      const codeNode = pre.find('code').first()
+      const classes = `${codeNode.attr('class') ?? ''} ${pre.attr('class') ?? ''}`
+      const explicitLanguage = pre.attr('data-language') || codeNode.attr('data-language')
+        || classes.match(/(?:^|\s)language-([\w+-]+)(?=\s|$)/)?.[1]
+      const language = explicitLanguage ? await ensurePrismLanguage(explicitLanguage) : 'text'
+      const grammar = language === 'text' ? undefined : prism.languages[language]
 
       if (!grammar) {
         const fallbackCode = $('<code class="language-text"></code>')
@@ -92,6 +95,9 @@ export async function modifyHTMLContent($: CheerioAPI, content: MessageSelection
       pre.html(`<code class="language-${language}">${highlightedCode}</code>`)
     }
     catch (error) {
+      const fallbackCode = $('<code class="language-text"></code>')
+      fallbackCode.text(pre.text())
+      pre.empty().append(fallbackCode)
       if (import.meta.env.DEV) {
         console.warn('Code highlighting failed', error)
       }
