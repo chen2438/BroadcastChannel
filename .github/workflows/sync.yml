@@ -35,6 +35,6 @@ jobs:
       - name: Sync check
         if: failure()
         run: |
-          echo "[Error] GitHub paused this scheduled sync because the upstream workflow file changed."
-          echo "[Error] Manually sync your fork once to re-enable future automatic updates."
+          echo "[Error] Upstream sync failed. Check the Sync upstream changes logs for the actual cause."
+          echo "[Error] If there are merge conflicts, resolve them in a pull request before the next scheduled sync."
           exit 1
